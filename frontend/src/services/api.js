@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://design-selection-backend.onrender.com/api';
 
 export const analyzeGarment = async (file, garmentType = 'blouse') => {
   const formData = new FormData();
