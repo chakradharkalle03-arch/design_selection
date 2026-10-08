@@ -52,7 +52,9 @@ app.include_router(rec_router)
 app.include_router(feedback_router)
 
 @app.get("/", tags=["Health"])
+@app.head("/", tags=["Health"])
 @app.get("/api/health", tags=["Health"])
+@app.head("/api/health", tags=["Health"])
 def health_check():
     return {
         "status": "healthy",
