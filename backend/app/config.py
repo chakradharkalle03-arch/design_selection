@@ -21,6 +21,7 @@ UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR}/embroidery.db")
 HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_HUB_TOKEN")
 MODEL_NAME = os.getenv("MODEL_NAME", "openai/clip-vit-base-patch32")
+LOW_MEMORY_MODE = os.getenv("LOW_MEMORY_MODE", "true").lower() in ("true", "1", "yes")
 CORS_ORIGINS = [
     origin.strip() for origin in os.getenv("CORS_ORIGINS", "*").split(",") if origin.strip()
 ]

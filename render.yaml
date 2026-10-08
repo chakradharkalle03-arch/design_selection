@@ -9,6 +9,8 @@ services:
     envVars:
       - key: PYTHONPATH
         value: backend
+      - key: LOW_MEMORY_MODE
+        value: "true"
       - key: MODEL_NAME
         value: openai/clip-vit-base-patch32
       - key: HF_TOKEN

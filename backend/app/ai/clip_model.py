@@ -1,9 +1,7 @@
 import os
-import torch
 import numpy as np
 from PIL import Image
-from transformers import CLIPProcessor, CLIPModel
-from app.config import MODEL_NAME, HF_TOKEN
+from app.config import MODEL_NAME, HF_TOKEN, LOW_MEMORY_MODE
 
 class CLIPEmbeddingEngine:
     _instance = None
@@ -13,6 +11,7 @@ class CLIPEmbeddingEngine:
             cls._instance = super(CLIPEmbeddingEngine, cls).__new__(cls)
             cls._instance._model = None
             cls._instance._processor = None
+            cls._instance._torch = None
             cls._instance._is_loaded = False
         return cls._instance
 
@@ -21,8 +20,17 @@ class CLIPEmbeddingEngine:
         if self._is_loaded:
             return
 
+        if LOW_MEMORY_MODE:
+            print("Low Memory Mode enabled (512MB RAM Optimization). Using fast visual feature embedding engine.")
+            self._is_loaded = False
+            return
+
         try:
             print(f"Loading HuggingFace CLIP model: {MODEL_NAME}...")
+            import torch
+            from transformers import CLIPProcessor, CLIPModel
+
+            self._torch = torch
             token = HF_TOKEN if HF_TOKEN and not HF_TOKEN.startswith("your_") else None
             
             self._processor = CLIPProcessor.from_pretrained(MODEL_NAME, token=token)
@@ -38,18 +46,17 @@ class CLIPEmbeddingEngine:
         """Generate normalized 512-dim embedding for an image."""
         try:
             self.load_model()
-            image = Image.open(image_path).convert("RGB")
-
-            if self._is_loaded and self._model is not None and self._processor is not None:
+            if self._is_loaded and self._model is not None and self._processor is not None and self._torch is not None:
+                image = Image.open(image_path).convert("RGB")
                 inputs = self._processor(images=image, return_tensors="pt")
-                with torch.no_grad():
+                with self._torch.no_grad():
                     output = self._model.get_image_features(**inputs)
                     
                     if hasattr(output, "image_embeds"):
                         feats = output.image_embeds
                     elif hasattr(output, "pooler_output"):
                         feats = output.pooler_output
-                    elif isinstance(output, torch.Tensor):
+                    elif isinstance(output, self._torch.Tensor):
                         feats = output
                     else:
                         feats = output[0]
@@ -69,16 +76,16 @@ class CLIPEmbeddingEngine:
 
         try:
             self.load_model()
-            if self._is_loaded and self._model is not None and self._processor is not None:
+            if self._is_loaded and self._model is not None and self._processor is not None and self._torch is not None:
                 inputs = self._processor(text=[text_prompt], return_tensors="pt", padding=True)
-                with torch.no_grad():
+                with self._torch.no_grad():
                     output = self._model.get_text_features(**inputs)
                     
                     if hasattr(output, "text_embeds"):
                         feats = output.text_embeds
                     elif hasattr(output, "pooler_output"):
                         feats = output.pooler_output
-                    elif isinstance(output, torch.Tensor):
+                    elif isinstance(output, self._torch.Tensor):
                         feats = output
                     else:
                         feats = output[0]
