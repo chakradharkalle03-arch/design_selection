@@ -7,6 +7,8 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      - key: PYTHONPATH
+        value: backend
       - key: MODEL_NAME
         value: openai/clip-vit-base-patch32
       - key: HF_TOKEN
