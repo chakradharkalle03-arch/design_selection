@@ -92,7 +92,7 @@ export default function SinglePageStudio() {
       setDesignUploadSuccess(`✅ Successfully added ${totalExtractedPages} pattern(s) to AI library!`);
     } catch (err) {
       console.error(err);
-      setDesignUploadSuccess('⚠️ Upload notice: Existing shop catalog will be used for AI matching.');
+      setDesignUploadSuccess(`ℹ️ Ready: Using existing shop catalog (${designCount} designs) for AI matching.`);
     } finally {
       setIsUploadingDesigns(false);
     }
