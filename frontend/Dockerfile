@@ -8,10 +8,10 @@ RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
-# Nginx production stage
-FROM nginx:alpine
-COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Caddy production stage
+FROM caddy:2-alpine
+COPY --from=build /app/dist /usr/share/caddy
+COPY frontend/Caddyfile /etc/caddy/Caddyfile
 
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
