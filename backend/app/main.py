@@ -12,7 +12,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.config import STORAGE_DIR, CORS_ORIGINS
-from app.database.database import engine, Base
+from app.database.database import engine, Base, SessionLocal
+from app.database.seeder import seed_existing_catalog_designs
 from app.api.upload import router as upload_router
 from app.api.designs import router as designs_router
 from app.api.recommendations import router as rec_router
@@ -24,6 +25,15 @@ async def lifespan(app: FastAPI):
     print("Initializing Database tables...")
     Base.metadata.create_all(bind=engine)
     print("Database ready.")
+    
+    # Auto-seed existing catalog images
+    try:
+        db = SessionLocal()
+        seed_existing_catalog_designs(db)
+        db.close()
+    except Exception as e:
+        print(f"Catalog seeding warning: {e}")
+
     yield
 
 app = FastAPI(
