@@ -1,4 +1,5 @@
 import os
+import sys
 from pathlib import Path
 from sqlalchemy.orm import Session
 from app.config import DESIGNS_DIR
@@ -11,7 +12,9 @@ def seed_existing_catalog_designs(db: Session):
     Scans DESIGNS_DIR for any pre-loaded catalog images and populates
     them into the database if not already present.
     """
+    print(f"🔍 Checking DESIGNS_DIR for catalog auto-seeding: {DESIGNS_DIR}", flush=True)
     if not DESIGNS_DIR.exists():
+        print(f"⚠️ DESIGNS_DIR does not exist: {DESIGNS_DIR}", flush=True)
         return
 
     valid_exts = {".jpg", ".jpeg", ".png", ".webp"}
@@ -20,8 +23,13 @@ def seed_existing_catalog_designs(db: Session):
         if f.is_file() and f.suffix.lower() in valid_exts and not f.name.endswith("_raw.pdf")
     ]
 
+    print(f"📦 Found {len(image_files)} catalog design image(s) in {DESIGNS_DIR}", flush=True)
+
     if not image_files:
         return
+
+    existing_count = db.query(Design).count()
+    print(f"📊 Current database design count: {existing_count}", flush=True)
 
     added_count = 0
     for img_path in image_files:
@@ -52,9 +60,14 @@ def seed_existing_catalog_designs(db: Session):
             )
             db.add(design)
             added_count += 1
+            if added_count % 10 == 0:
+                db.commit()
+                print(f"  ... seeded {added_count} designs so far", flush=True)
         except Exception as e:
-            print(f"Error seeding design {file_name}: {e}")
+            print(f"❌ Error seeding design {file_name}: {e}", flush=True)
 
     if added_count > 0:
         db.commit()
-        print(f"✅ Successfully auto-seeded {added_count} shop catalog designs into database!")
+        print(f"✅ Successfully auto-seeded {added_count} shop catalog designs into database!", flush=True)
+    else:
+        print(f"ℹ️ All {len(image_files)} catalog designs are already in the database.", flush=True)
