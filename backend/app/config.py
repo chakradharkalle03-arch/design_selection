@@ -9,7 +9,7 @@ if env_path.exists():
 else:
     load_dotenv()
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 STORAGE_DIR = BASE_DIR / "storage"
 DESIGNS_DIR = STORAGE_DIR / "designs"
 UPLOADS_DIR = STORAGE_DIR / "customer_uploads"
