@@ -10,7 +10,14 @@ else:
     load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-STORAGE_DIR = BASE_DIR / "storage"
+env_storage = os.getenv("STORAGE_DIR")
+if env_storage and Path(env_storage).exists():
+    STORAGE_DIR = Path(env_storage)
+elif Path("/app/storage").exists():
+    STORAGE_DIR = Path("/app/storage")
+else:
+    STORAGE_DIR = BASE_DIR / "storage"
+
 DESIGNS_DIR = STORAGE_DIR / "designs"
 UPLOADS_DIR = STORAGE_DIR / "customer_uploads"
 
