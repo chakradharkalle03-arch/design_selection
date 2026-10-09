@@ -184,6 +184,12 @@ h1, h2, h3, h4, .font-heading {
   .recommendations-grid {
     grid-template-columns: 1fr;
   }
+  .nav-label {
+    display: none;
+  }
+  .nav-btn {
+    padding: 6px 10px !important;
+  }
 }
 
 /* Pulse Animation */

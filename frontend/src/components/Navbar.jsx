@@ -55,7 +55,7 @@ export default function Navbar({ activeTab, setActiveTab }) {
         </div>
 
         {/* Navigation Tabs */}
-        <nav style={{ display: 'flex', gap: '8px' }}>
+        <nav className="mobile-nav" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -63,23 +63,24 @@ export default function Navbar({ activeTab, setActiveTab }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
+                className="nav-btn"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 18px',
+                  gap: '6px',
+                  padding: '8px 12px',
                   borderRadius: 'var(--radius-sm)',
                   border: isActive ? '1px solid var(--accent-gold)' : '1px solid transparent',
                   background: isActive ? 'rgba(212, 175, 55, 0.15)' : 'transparent',
                   color: isActive ? 'var(--accent-gold-light)' : 'var(--text-secondary)',
                   fontWeight: isActive ? 600 : 400,
-                  fontSize: '0.9rem',
+                  fontSize: '0.85rem',
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
                 <Icon size={18} color={isActive ? 'var(--accent-gold)' : 'currentColor'} />
-                {tab.label}
+                <span className="nav-label">{tab.label}</span>
               </button>
             );
           })}
