@@ -1,10 +1,13 @@
 import axios from 'axios';
 
-const defaultBaseUrl = typeof window !== 'undefined' && window.location.hostname
-  ? `http://${window.location.hostname}:8001/api`
-  : 'http://localhost:8001/api';
+const getApiBase = () => {
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  return '/api';
+};
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || defaultBaseUrl;
+const API_BASE = getApiBase();
 
 export const analyzeGarment = async (file, garmentType = 'blouse') => {
   const formData = new FormData();
