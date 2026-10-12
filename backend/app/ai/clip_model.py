@@ -2,7 +2,7 @@ import os
 import requests
 import numpy as np
 from PIL import Image
-from app.config import MODEL_NAME, HF_TOKEN, LOW_MEMORY_MODE
+from app.config import MODEL_NAME, HF_TOKEN, LOW_MEMORY_MODE, MODEL_DIR
 
 class CLIPEmbeddingEngine:
     _instance = None
@@ -13,41 +13,46 @@ class CLIPEmbeddingEngine:
             cls._instance._model = None
             cls._instance._processor = None
             cls._instance._torch = None
+            cls._instance._device = "cpu"
             cls._instance._is_loaded = False
         return cls._instance
 
     def load_local_model(self):
-        """Lazy loader for local PyTorch CLIP vision & text model (Requires >1GB RAM)."""
+        """Lazy loader for local PyTorch CLIP vision & text model (100% offline, local inference)."""
         if self._is_loaded:
             return
 
         if LOW_MEMORY_MODE:
+            print("Notice: LOW_MEMORY_MODE is enabled via environment. Skipping local model load.")
             return
 
         try:
-            print(f"Loading local HuggingFace CLIP model: {MODEL_NAME}...")
             import torch
             from transformers import CLIPProcessor, CLIPModel
 
             self._torch = torch
+            self._device = "cuda" if torch.cuda.is_available() else "cpu"
             token = HF_TOKEN if HF_TOKEN and not HF_TOKEN.startswith("your_") else None
             
+            print(f"[AI Model] Loading local HuggingFace CLIP model: '{MODEL_NAME}' on device '{self._device}'...")
+            print("[AI Model] Model weights run locally offline (zero external API tokens needed).")
+
             self._processor = CLIPProcessor.from_pretrained(MODEL_NAME, token=token)
             self._model = CLIPModel.from_pretrained(MODEL_NAME, token=token)
+            self._model.to(self._device)
             self._model.eval()
             self._is_loaded = True
-            print("Local CLIP PyTorch model loaded successfully.")
+            print(f"[AI Model] Local CLIP PyTorch model loaded successfully on device '{self._device}'.")
         except Exception as e:
             print(f"Warning: Could not load local PyTorch CLIP model ({e}). Using Cloud API/Fallback.")
             self._is_loaded = False
 
     def _query_hf_cloud_api(self, payload: dict, is_binary: bool = False):
-        """Call Hugging Face Serverless Cloud Inference API for 100% real CLIP execution with ~0MB local RAM."""
+        """Optional fallback: Call Hugging Face Cloud Inference API if local model unavailable."""
         token = HF_TOKEN if HF_TOKEN and not HF_TOKEN.startswith("your_") else os.getenv("HUGGINGFACE_HUB_TOKEN")
         if not token:
             return None
 
-        # HF Router / Inference API endpoint URLs for feature extraction
         endpoints = [
             f"https://router.huggingface.co/hf-inference/models/{MODEL_NAME}",
             f"https://api-inference.huggingface.co/models/{MODEL_NAME}",
@@ -64,7 +69,6 @@ class CLIPEmbeddingEngine:
 
                 if response.status_code == 200:
                     data = response.json()
-                    # Parse returned 512-dim embedding vector
                     if isinstance(data, list):
                         if len(data) > 0 and isinstance(data[0], list):
                             data = data[0]
@@ -76,79 +80,79 @@ class CLIPEmbeddingEngine:
                         if norm > 0:
                             vec = vec / norm
                         return vec.tolist()
-            except Exception as e:
+            except Exception:
                 continue
 
         return None
 
     def generate_image_embedding(self, image_path: str) -> list:
-        """Generate normalized 512-dim CLIP embedding for an image."""
-        # 1. Try Hugging Face Cloud Inference API (0MB local RAM, 100% Real CLIP AI)
+        """Generate normalized 512-dim CLIP embedding for an image (Priority 1: Local PyTorch CLIP)."""
+        # 1. Primary: Run Local PyTorch CLIP on CPU/GPU (100% offline, zero API dependency)
+        try:
+            if not self._is_loaded:
+                self.load_local_model()
+
+            if self._is_loaded and self._model is not None and self._processor is not None and self._torch is not None:
+                image = Image.open(image_path).convert("RGB")
+                inputs = self._processor(images=image, return_tensors="pt")
+                if self._device != "cpu":
+                    inputs = {k: v.to(self._device) for k, v in inputs.items()}
+
+                with self._torch.no_grad():
+                    output = self._model.get_image_features(**inputs)
+                    
+                    if isinstance(output, self._torch.Tensor):
+                        feats = output
+                    elif getattr(output, "pooler_output", None) is not None:
+                        feats = output.pooler_output
+                    elif getattr(output, "image_embeds", None) is not None:
+                        feats = output.image_embeds
+                    else:
+                        feats = output[0]
+
+                    feats = feats / feats.norm(p=2, dim=-1, keepdim=True)
+                    embedding = feats.squeeze().cpu().numpy().tolist()
+                    return [float(x) for x in embedding]
+        except Exception as e:
+            print(f"Local CLIP image inference notice: {e}")
+
+        # 2. Secondary: Try Hugging Face Cloud Inference API if token configured
         try:
             with open(image_path, "rb") as f:
                 img_bytes = f.read()
             cloud_embedding = self._query_hf_cloud_api({"file_bytes": img_bytes}, is_binary=True)
             if cloud_embedding and len(cloud_embedding) >= 128:
-                print("Generated 512-dim image embedding via Hugging Face Cloud CLIP API.")
                 return cloud_embedding
-        except Exception as e:
+        except Exception:
             pass
 
-        # 2. Try Local PyTorch CLIP (if RAM available)
-        try:
-            self.load_local_model()
-            if self._is_loaded and self._model is not None and self._processor is not None and self._torch is not None:
-                image = Image.open(image_path).convert("RGB")
-                inputs = self._processor(images=image, return_tensors="pt")
-                with self._torch.no_grad():
-                    output = self._model.get_image_features(**inputs)
-                    
-                    if hasattr(output, "image_embeds"):
-                        feats = output.image_embeds
-                    elif hasattr(output, "pooler_output"):
-                        feats = output.pooler_output
-                    elif isinstance(output, self._torch.Tensor):
-                        feats = output
-                    else:
-                        feats = output[0]
-
-                    feats = feats / feats.norm(p=2, dim=-1, keepdim=True)
-                    embedding = feats.squeeze().cpu().numpy().tolist()
-                    return [float(x) for x in embedding]
-        except Exception as e:
-            print(f"Error during local CLIP image inference: {e}.")
-
-        # 3. Fallback to lightweight feature extraction
+        # 3. Graceful Fallback: Lightweight visual histogram & texture feature vector
         return self._generate_fallback_embedding(image_path)
 
     def generate_text_embedding(self, text_prompt: str) -> list:
-        """Generate normalized 512-dim CLIP text embedding for prompt requirement."""
+        """Generate normalized 512-dim CLIP text embedding for prompt requirement (Priority 1: Local PyTorch CLIP)."""
         if not text_prompt or not text_prompt.strip():
             return []
 
-        # 1. Try Hugging Face Cloud Inference API (0MB local RAM, 100% Real CLIP AI)
+        # 1. Primary: Run Local PyTorch CLIP on CPU/GPU
         try:
-            cloud_embedding = self._query_hf_cloud_api({"inputs": text_prompt}, is_binary=False)
-            if cloud_embedding and len(cloud_embedding) >= 128:
-                print("Generated 512-dim text embedding via Hugging Face Cloud CLIP API.")
-                return cloud_embedding
-        except Exception as e:
-            pass
+            if not self._is_loaded:
+                self.load_local_model()
 
-        # 2. Try Local PyTorch CLIP (if RAM available)
-        try:
-            self.load_local_model()
             if self._is_loaded and self._model is not None and self._processor is not None and self._torch is not None:
                 inputs = self._processor(text=[text_prompt], return_tensors="pt", padding=True)
+                if self._device != "cpu":
+                    inputs = {k: v.to(self._device) for k, v in inputs.items()}
+
                 with self._torch.no_grad():
                     output = self._model.get_text_features(**inputs)
                     
-                    if hasattr(output, "text_embeds"):
-                        feats = output.text_embeds
-                    elif hasattr(output, "pooler_output"):
-                        feats = output.pooler_output
-                    elif isinstance(output, self._torch.Tensor):
+                    if isinstance(output, self._torch.Tensor):
                         feats = output
+                    elif getattr(output, "pooler_output", None) is not None:
+                        feats = output.pooler_output
+                    elif getattr(output, "text_embeds", None) is not None:
+                        feats = output.text_embeds
                     else:
                         feats = output[0]
 
@@ -156,9 +160,17 @@ class CLIPEmbeddingEngine:
                     embedding = feats.squeeze().cpu().numpy().tolist()
                     return [float(x) for x in embedding]
         except Exception as e:
-            print(f"Error generating local text embedding: {e}")
+            print(f"Local CLIP text inference notice: {e}")
 
-        # Basic keyword fallback vector
+        # 2. Secondary: Hugging Face Cloud Inference API
+        try:
+            cloud_embedding = self._query_hf_cloud_api({"inputs": text_prompt}, is_binary=False)
+            if cloud_embedding and len(cloud_embedding) >= 128:
+                return cloud_embedding
+        except Exception:
+            pass
+
+        # 3. Graceful Fallback: Basic keyword vector
         vec = np.zeros(512, dtype=np.float32)
         vec[0] = 1.0
         return vec.tolist()

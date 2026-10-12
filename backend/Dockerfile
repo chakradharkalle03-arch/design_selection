@@ -12,6 +12,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Pre-download local CLIP AI model into image
+COPY backend/app/config.py ./app/
+COPY backend/download_model.py .
+RUN python download_model.py || true
+
 COPY backend/app ./app
 COPY storage /app/storage
 COPY ml /app/ml
