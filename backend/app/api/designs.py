@@ -110,7 +110,7 @@ async def upload_new_design(
         if is_pdf(str(raw_path)):
             pages = convert_all_pdf_pages_to_images(str(raw_path), DESIGNS_DIR, base_code)
             
-            for p_info in pages:
+            for idx, p_info in enumerate(pages):
                 img_path = p_info["image_path"]
                 img_filename = p_info["filename"]
                 p_code = p_info["design_code"]
@@ -139,6 +139,9 @@ async def upload_new_design(
                 )
                 db.add(new_design)
                 created_designs.append(new_design)
+
+                if (idx + 1) % 10 == 0 or (idx + 1) == len(pages):
+                    print(f"  ... generated AI embeddings & seeded {idx + 1}/{len(pages)} PDF page designs so far")
 
             db.commit()
             return {

@@ -48,6 +48,8 @@ body {
   line-height: 1.5;
   background-image: 
     linear-gradient(rgba(11, 14, 20, 0.85), rgba(11, 14, 20, 0.90)),
+    url('/background_image.png'),
+    url('/background image.png'),
     url('/background.jpeg');
   background-size: cover;
   background-position: center;

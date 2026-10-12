@@ -63,17 +63,18 @@ export default function SinglePageStudio() {
 
     setDesignFiles(files);
     setIsUploadingDesigns(true);
-    setDesignUploadSuccess(`Processing ${files.length} design file(s)${isFolder ? ' from folder' : ''}...`);
+    setDesignUploadSuccess(`Processing 1/${files.length} design file(s)${isFolder ? ' from folder' : ''}...`);
 
     try {
       let totalExtractedPages = 0;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        // Skip non-image / non-pdf system files if folder upload
         const ext = file.name.toLowerCase();
         if (!ext.endsWith('.jpg') && !ext.endsWith('.jpeg') && !ext.endsWith('.png') && !ext.endsWith('.webp') && !ext.endsWith('.pdf')) {
           continue;
         }
+
+        setDesignUploadSuccess(`Processing file ${i + 1}/${files.length}: ${file.name} (${totalExtractedPages} pattern(s) added so far)...`);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -87,12 +88,14 @@ export default function SinglePageStudio() {
         } else {
           totalExtractedPages += 1;
         }
+        await loadLibraryCount();
       }
       await loadLibraryCount();
-      setDesignUploadSuccess(`✅ Successfully added ${totalExtractedPages} pattern(s) to AI library!`);
+      setDesignUploadSuccess(`✅ Successfully processed all files and added ${totalExtractedPages} pattern(s) to AI library!`);
     } catch (err) {
       console.error(err);
-      setDesignUploadSuccess(`ℹ️ Ready: Using existing shop catalog (${designCount} designs) for AI matching.`);
+      await loadLibraryCount();
+      setDesignUploadSuccess(`ℹ️ Ready: Using existing shop catalog for AI matching.`);
     } finally {
       setIsUploadingDesigns(false);
     }

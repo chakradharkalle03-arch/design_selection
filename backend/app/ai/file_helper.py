@@ -71,6 +71,9 @@ def convert_all_pdf_pages_to_images(pdf_path: str, output_dir: Path, base_prefix
                 "text_content": text.strip()
             })
 
+            if page_num % 20 == 0 or page_num == len(doc):
+                print(f"  ... rendered & extracted {page_num}/{len(doc)} PDF pages into high-res images so far")
+
         doc.close()
         return results
 

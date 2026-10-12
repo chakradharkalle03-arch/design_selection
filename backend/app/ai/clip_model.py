@@ -47,32 +47,37 @@ class CLIPEmbeddingEngine:
         if not token:
             return None
 
-        # HF Router / Inference API endpoint for feature extraction
-        url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{MODEL_NAME}"
+        # HF Router / Inference API endpoint URLs for feature extraction
+        endpoints = [
+            f"https://router.huggingface.co/hf-inference/models/{MODEL_NAME}",
+            f"https://api-inference.huggingface.co/models/{MODEL_NAME}",
+            f"https://api-inference.huggingface.co/pipeline/feature-extraction/{MODEL_NAME}"
+        ]
         headers = {"Authorization": f"Bearer {token}"}
 
-        try:
-            if is_binary:
-                response = requests.post(url, headers=headers, data=payload.get("file_bytes"), timeout=8)
-            else:
-                response = requests.post(url, headers=headers, json=payload, timeout=8)
+        for url in endpoints:
+            try:
+                if is_binary:
+                    response = requests.post(url, headers=headers, data=payload.get("file_bytes"), timeout=6)
+                else:
+                    response = requests.post(url, headers=headers, json=payload, timeout=6)
 
-            if response.status_code == 200:
-                data = response.json()
-                # Parse returned 512-dim embedding vector
-                if isinstance(data, list):
-                    if len(data) > 0 and isinstance(data[0], list):
-                        data = data[0]
-                    if len(data) > 0 and isinstance(data[0], list):
-                        data = data[0]
-                    
-                    vec = np.array(data, dtype=np.float32)
-                    norm = np.linalg.norm(vec)
-                    if norm > 0:
-                        vec = vec / norm
-                    return vec.tolist()
-        except Exception as e:
-            print(f"Hugging Face Cloud API call notice: {e}")
+                if response.status_code == 200:
+                    data = response.json()
+                    # Parse returned 512-dim embedding vector
+                    if isinstance(data, list):
+                        if len(data) > 0 and isinstance(data[0], list):
+                            data = data[0]
+                        if len(data) > 0 and isinstance(data[0], list):
+                            data = data[0]
+                        
+                        vec = np.array(data, dtype=np.float32)
+                        norm = np.linalg.norm(vec)
+                        if norm > 0:
+                            vec = vec / norm
+                        return vec.tolist()
+            except Exception as e:
+                continue
 
         return None
 
